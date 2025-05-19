@@ -23,7 +23,7 @@ function App() {
   }, [dispatch, user]);
 
   return (
-    <div className="bg-slate-500 w-[100%] h-auto">
+    <div className="bg-slate-500 w-[100%] min-h-screen h-auto">
       <Outlet></Outlet>
     </div>
   );

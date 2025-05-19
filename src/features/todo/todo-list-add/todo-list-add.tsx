@@ -49,7 +49,7 @@ export function TodoAddForm() {
 
       queryClient.setQueryData(["todos", userId], (old: ToDoTypeWithId[]) => [
         ...(old || []),
-        { ...newTodo, id: "temp-id" }, 
+        { ...newTodo, id: "temp-id" },
       ]);
 
       return { previousTodos };
@@ -74,7 +74,10 @@ export function TodoAddForm() {
           owner: userId,
           title: data.title,
           description: data.description,
-          list: data.list,
+          list: data.list.map((item) => ({
+            ...item,
+            id: crypto.randomUUID(),
+          })),
         });
         console.log("Додано новий todo:", todo);
       } else {

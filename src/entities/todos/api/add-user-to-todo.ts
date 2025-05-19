@@ -1,7 +1,7 @@
 import { findUserByEmail } from "../../user/api/find-user-by-email";
 import type { Participant } from "../type/participant";
 import { getTodoById } from "./get-todo-by-id";
-import { patchTodo } from "./path-todo";
+import { patchTodo } from "./patсh-todo";
 
 export async function addUserToTodo(params: {
   todoId: string;

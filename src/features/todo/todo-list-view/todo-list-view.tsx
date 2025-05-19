@@ -1,18 +1,14 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { findToDoByUser } from "../../../entities/todos/api/find-todo-by-user";
-import type {
-  ToDoType,
-  ToDoTypeWithId,
-} from "../../../entities/todos/type/todo-type";
+import type { ToDoTypeWithId } from "../../../entities/todos/type/todo-type";
 import { userSlice } from "../../../entities/user/slice/user-slice";
 import { useAppSelector } from "../../../app/providers/redux-store/redux";
-import { useState } from "react";
 import { FaTrash, FaEdit, FaShare, FaSave, FaTimes } from "react-icons/fa";
-import { patchTodo } from "../../../entities/todos/api/path-todo";
-import { queryClient } from "../../../app/providers/react-query/query-provider";
 import { ModalShare } from "../todo-modal/todo-modal";
-import { addUserToTodo } from "../../../entities/todos/api/add-user-to-todo";
-import { deleteToDo } from "../../../entities/todos/api/delete-todo";
+import { useListView } from "./hooks/use-list-view";
+import { UiButton } from "../../../shared/ui/button/ui-button";
+import AddTaskModal from "../todo-modal/todo-tast-modal";
+import { EditTaskModal } from "../todo-modal/edit-tast-modal";
 
 export function TodoListView() {
   const userId = useAppSelector(userSlice.selectors.userId);
@@ -26,145 +22,34 @@ export function TodoListView() {
     enabled: !!userId,
   });
 
-  const [shareTodo, setShareTodo] = useState<ToDoTypeWithId | null>(null);
-
-  const [editingTodo, setEditingTodo] = useState<{
-    id: string;
-    title: string;
-  } | null>(null);
-
-  const todoMutation = useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: Partial<ToDoType> }) =>
-      patchTodo(id, updates),
-    onMutate: async ({ id, updates }) => {
-      if (!userId) return;
-
-      await queryClient.cancelQueries({ queryKey: ["todos", userId] });
-
-      const previousTodos = queryClient.getQueryData<ToDoTypeWithId[]>([
-        "todos",
-        userId,
-      ]);
-
-      if (previousTodos) {
-        queryClient.setQueryData<ToDoTypeWithId[]>(["todos", userId], (old) =>
-          old?.map((todo) =>
-            todo.id === id
-              ? {
-                  ...todo,
-                  ...updates,
-                  list: updates.list ?? todo.list,
-                }
-              : todo
-          )
-        );
-      }
-
-      return { previousTodos };
-    },
-
-    onError: (_, __, context) => {
-      if (context?.previousTodos && userId) {
-        queryClient.setQueryData(["todos", userId], context.previousTodos);
-      }
-    },
-
-    onSettled: () => {
-      if (userId) {
-        queryClient.invalidateQueries({ queryKey: ["todos", userId] });
-      }
-    },
-  });
-
-  const addUserToTodoMutation = useMutation({ mutationFn: addUserToTodo });
-  const deleteTodoMutation = useMutation({
-    mutationFn: deleteToDo,
-    onMutate: async (todoId: string) => {
-      await queryClient.cancelQueries({ queryKey: ["todos", userId] });
-
-      const previousTodos = queryClient.getQueryData<ToDoTypeWithId[]>([
-        "todos",
-        userId,
-      ]);
-
-      queryClient.setQueryData(["todos", userId], (old?: ToDoTypeWithId[]) =>
-        old?.filter((todo) => todo.id !== todoId)
-      );
-
-      return { previousTodos };
-    },
-
-    onError: (_err, _todoId, context) => {
-      if (context?.previousTodos) {
-        queryClient.setQueryData(["todos", userId], context.previousTodos);
-      }
-    },
-
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["todos", userId] });
-    },
-  });
-
-  const handleEditClick = (todo: ToDoTypeWithId) => {
-    setEditingTodo({ id: todo.id, title: todo.title });
-  };
-
-  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (editingTodo) {
-      setEditingTodo({ ...editingTodo, title: e.target.value });
-    }
-  };
-
-  const handleSaveTitle = (id: string) => {
-    if (!editingTodo) return;
-
-    todoMutation.mutate({
-      id,
-      updates: { title: editingTodo.title },
-    });
-
-    setEditingTodo(null);
-  };
-
-  const handleCancelEdit = () => {
-    setEditingTodo(null);
-  };
-
-  const handleDelete = (todoId: string) => {
-    deleteTodoMutation.mutate(todoId);
-  };
-
-  const handleShare = (todo: ToDoTypeWithId) => {
-    setShareTodo(todo);
-  };
-
-  const handleToggleTaskDone = (todoId: string, taskId: number) => {
-    const todo = todos?.find((t) => t.id === todoId);
-    if (!todo) return;
-
-    const updatedList = todo.list.map((item) =>
-      item.id === taskId ? { ...item, isDone: !item.isDone } : item
-    );
-
-    todoMutation.mutate({
-      id: todoId,
-      updates: { list: updatedList },
-    });
-  };
-
-  async function addUserToTodoModal(
-    todoId: string,
-    email: string,
-    role: "admin" | "viewer"
-  ) {
-    addUserToTodoMutation.mutate({ todoId, email, role });
-  }
+  const {
+    shareTodo,
+    handleEditClick,
+    handleCancelEdit,
+    handleTitleChange,
+    handleSaveTitle,
+    handleDelete,
+    addUserToTodoModal,
+    handleShare,
+    handleToggleTaskDone,
+    editingTodo,
+    setShareTodo,
+    handleDeleteTask,
+    isTaskModalOpen,
+    handleOpenNewTaskModal,
+    setIsTaskModalOpen,
+    handleAddTask,
+    handleEditTaskClick,
+    handleSaveTask,
+    selectedTask,
+    setSelectedTask,
+  } = useListView({ userId, todos });
 
   if (isLoading) return <p>Завантаження...</p>;
   if (error) return <p>Помилка при завантаженні</p>;
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-wrap w-[80%] gap-10 space-y-4">
       {todos?.map((todo) => {
         const isOwner = todo.owner === userId;
         const isAdmin = todo.participants?.some(
@@ -176,7 +61,7 @@ export function TodoListView() {
         return (
           <div
             key={todo.id}
-            className="p-4 bg-white rounded shadow border border-slate-200 min-w-[200px]"
+            className="p-4 bg-white rounded shadow border border-slate-200 min-w-[330px]"
           >
             {editingTodo?.id === todo.id && canEdit ? (
               <div className="flex items-center space-x-2">
@@ -226,21 +111,59 @@ export function TodoListView() {
 
             <ul className="list-disc list-inside mt-2">
               {todo.list.map((item) => (
-                <li key={item.id} className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    checked={item.isDone}
-                    disabled={!canEdit}
-                    onChange={() =>
-                      canEdit && handleToggleTaskDone(todo.id, item.id)
-                    }
-                  />
-                  <span className={item.isDone ? "line-through" : ""}>
-                    {item.text}
-                  </span>
+                <li
+                  key={item.id}
+                  className="flex flex-col space-y-1 border-b border-gray-100 py-2 group hover:bg-slate-200 rounded-[6px] px-1 cursor-pointer"
+                  onClick={() => handleEditTaskClick(todo.id, item)}
+                >
+                  <div className="flex items-center justify-between space-x-2">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={item.isDone}
+                        disabled={!canEdit}
+                        onChange={() =>
+                          canEdit && handleToggleTaskDone(todo.id, item.id)
+                        }
+                      />
+                      <span className={item.isDone ? "line-through" : ""}>
+                        {item.text}
+                      </span>
+                    </div>
+                    {canEdit && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteTask(
+                            todo.id,
+                            todo.list.filter((value) => value.id !== item.id)
+                          );
+                        }}
+                        className="text-red-500 hover:text-red-700 hover:scale-110"
+                        title="Видалити підзавдання"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  {item.descriptionTask && (
+                    <div className="ml-6 text-sm text-gray-500 italic">
+                      {item.descriptionTask}
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
+            {canEdit && (
+              <div className="w-[100%] flex justify-center mt-3">
+                <UiButton
+                  text="Нова таска"
+                  type="button"
+                  onClick={() => handleOpenNewTaskModal(todo.id)}
+                ></UiButton>
+              </div>
+            )}
           </div>
         );
       })}
@@ -255,6 +178,21 @@ export function TodoListView() {
             : Promise.reject()
         }
       />
+
+      {selectedTask && (
+        <EditTaskModal
+          task={selectedTask}
+          onClose={() => setSelectedTask(null)}
+          onSave={handleSaveTask}
+        />
+      )}
+
+      {isTaskModalOpen && (
+        <AddTaskModal
+          onClose={() => setIsTaskModalOpen(false)}
+          onAdd={handleAddTask}
+        />
+      )}
     </div>
   );
 }

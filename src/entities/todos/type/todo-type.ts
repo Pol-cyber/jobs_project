@@ -1,6 +1,6 @@
 import type { Participant } from "./participant";
 
-export type ToDoListType = { id: number; text: string; isDone: boolean }
+export type ToDoListType = { id: string; text: string; descriptionTask?: string; isDone: boolean }
 
 export type ToDoType = {
   title: string;
